@@ -14,15 +14,18 @@ import (
 )
 
 const maxUploadSize = 10 * 1024 * 1024
-const uploadPath = "./public"
+
+var mainDir = "./public"
 
 func main() {
 	portPtr := flag.String("p", "8081", "port")
+	mainDirPtr := flag.String("d", "./public", "main file dir")
 	flag.Parse()
 
 	port := *portPtr
-	if !goutil.Exists(uploadPath) {
-		if err := os.Mkdir(uploadPath, os.ModePerm); err != nil {
+	mainDir = *mainDirPtr
+	if !goutil.Exists(mainDir) {
+		if err := os.Mkdir(mainDir, os.ModePerm); err != nil {
 			panic(err)
 		}
 	}
@@ -31,7 +34,7 @@ func main() {
 	http.HandleFunc("/delete/", deleteFileHandler())
 	http.HandleFunc("/list/", listFileHandler())
 
-	fs := http.FileServer(http.Dir(uploadPath))
+	fs := http.FileServer(http.Dir(mainDir))
 	http.Handle("/files/", http.StripPrefix("/files", fs))
 
 	log.Println("listen on", port)
@@ -50,7 +53,7 @@ func uploadFileHandler() http.HandlerFunc {
 
 		fileName := r.PostFormValue("filename")
 		dir := r.PostFormValue("dir")
-		dir = filepath.Join(uploadPath, dir)
+		dir = filepath.Join(mainDir, dir)
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 			renderError(w, "INVALID_DIR", http.StatusBadRequest)
 			return
@@ -104,7 +107,7 @@ func deleteFileHandler() http.HandlerFunc {
 				return
 			}
 
-			deletePath = filepath.Join(uploadPath, deletePath)
+			deletePath = filepath.Join(mainDir, deletePath)
 			fmt.Println("delete path:", deletePath)
 			err := os.RemoveAll(deletePath)
 			if err != nil {
@@ -126,14 +129,14 @@ func listFileHandler() http.HandlerFunc {
 			if len(listPath) == 0 {
 				listPath = "/"
 			}
-			listPath = filepath.Join(uploadPath, listPath)
+			listPath = filepath.Join(mainDir, listPath)
 			fd, err := ioutil.ReadDir(listPath)
 			if err != nil {
 				renderError(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			result := "文件名\t\t大小\t\t修改时间\n"
+			result := "修改时间\t大小\t\t文件名\n"
 			for _, fi := range fd {
 				result += PadStr(goutil.FormatBytes(float64(fi.Size())), 12) + "\t"
 				result += PadStr(goutil.FromNowUnix(fi.ModTime().Unix()), 15) + "\t"
