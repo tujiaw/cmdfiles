@@ -29,6 +29,7 @@ func main() {
 
 	http.HandleFunc("/upload", uploadFileHandler())
 	http.HandleFunc("/delete/", deleteFileHandler())
+	http.HandleFunc("/list/", listFileHandler())
 
 	fs := http.FileServer(http.Dir(uploadPath))
 	http.Handle("/files/", http.StripPrefix("/files", fs))
@@ -95,8 +96,9 @@ func uploadFileHandler() http.HandlerFunc {
 
 func deleteFileHandler() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path[0:7] == "/delete" {
-			deletePath := r.URL.Path[8:]
+		const PREFIX = "/delete"
+		if r.URL.Path[0:len(PREFIX)] == PREFIX {
+			deletePath := r.URL.Path[len(PREFIX)+1:]
 			if len(deletePath) == 0 {
 				renderError(w, "INVALID_URL", http.StatusBadRequest)
 				return
@@ -116,8 +118,48 @@ func deleteFileHandler() http.HandlerFunc {
 	})
 }
 
+func listFileHandler() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		const PREFIX = "/list"
+		if r.URL.Path[0:len(PREFIX)] == PREFIX {
+			listPath := r.URL.Path[len(PREFIX)+1:]
+			if len(listPath) == 0 {
+				listPath = "/"
+			}
+			listPath = filepath.Join(uploadPath, listPath)
+			fd, err := ioutil.ReadDir(listPath)
+			if err != nil {
+				renderError(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			result := "文件名\t\t大小\t\t修改时间\n"
+			for _, fi := range fd {
+				result += PadStr(goutil.FormatBytes(float64(fi.Size())), 12) + "\t"
+				result += PadStr(goutil.FromNowUnix(fi.ModTime().Unix()), 15) + "\t"
+				if fi.IsDir() {
+					result += fi.Name() + "/" + "\t"
+				} else {
+					result += fi.Name() + "\t"
+				}
+				result += "\n"
+			}
+			w.Write([]byte(result))
+		} else {
+			renderError(w, "INVALID_URL", http.StatusBadRequest)
+		}
+	})
+}
+
 func renderError(w http.ResponseWriter, message string, statusCode int) {
 	log.Println("ERROR", message)
 	w.WriteHeader(statusCode)
 	w.Write([]byte(message))
+}
+
+func PadStr(str string, width int) string {
+	for i := 0; i < width-len(str); i++ {
+		str += " "
+	}
+	return str
 }

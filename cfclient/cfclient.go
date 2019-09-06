@@ -71,6 +71,11 @@ func (c Config) downloadUrl(path string) string {
 	return c.append(tmp, path)
 }
 
+func (c Config) listUrl(path string) string {
+	tmp := c.append(c.address(), "list")
+	return c.append(tmp, path)
+}
+
 func (c Config) append(first string, second string) string {
 	if len(second) > 0 {
 		if second[0] != '/' {
@@ -99,13 +104,13 @@ func init() {
 
 func main() {
 	start := time.Now()
-	fmt.Println(os.TempDir())
 	if len(os.Args) == 1 || os.Args[1] == "help" {
 		fmt.Println("command error")
 		fmt.Println("usage: app config [<args>]")
 		fmt.Println("usage: app upload [<args>]")
 		fmt.Println("usage: app down [<args>]")
 		fmt.Println("usage: app delete [<args>]")
+		fmt.Println("usage: app list [<args>]")
 		return
 	}
 
@@ -124,11 +129,15 @@ func main() {
 	deleteCommand := flag.NewFlagSet("delete", flag.ExitOnError)
 	deleteFromPtr := deleteCommand.String("from", "", "remote file path")
 
+	listCommand := flag.NewFlagSet("list", flag.ExitOnError)
+	listFromPtr := listCommand.String("from", "", "remote file path")
+
 	cmds := map[string]*flag.FlagSet{}
 	cmds["config"] = configCommand
 	cmds["upload"] = uploadCommand
 	cmds["down"] = downloadCommand
 	cmds["delete"] = deleteCommand
+	cmds["list"] = listCommand
 
 	cmd, exist := cmds[os.Args[1]]
 	if exist {
@@ -151,17 +160,19 @@ func main() {
 	if configCommand.Parsed() {
 		config.save(*hostPtr, *portPtr)
 	} else if uploadCommand.Parsed() {
-		uploadFile(*uploadFromPtr, *uploadToPtr)
+		uploadFileHandle(*uploadFromPtr, *uploadToPtr)
 	} else if downloadCommand.Parsed() {
-		downloadFile(*downloadFromPtr, *downloadToPtr)
+		downloadFileHandle(*downloadFromPtr, *downloadToPtr)
 	} else if deleteCommand.Parsed() {
-		remoteDeleteFile(*deleteFromPtr)
+		DeleteFileHandle(*deleteFromPtr)
+	} else if listCommand.Parsed() {
+		ListFileHandle(*listFromPtr)
 	}
 
 	fmt.Println("------", time.Since(start), "------")
 }
 
-func uploadFile(from string, to string) {
+func uploadFileHandle(from string, to string) {
 	if len(from) == 0 {
 		panic(errors.New("local file path is empty!"))
 	}
@@ -202,7 +213,7 @@ func uploadFile(from string, to string) {
 	}
 }
 
-func downloadFile(from string, to string) {
+func downloadFileHandle(from string, to string) {
 	if len(from) == 0 {
 		panic(errors.New("remote file path is empty!"))
 	}
@@ -211,6 +222,15 @@ func downloadFile(from string, to string) {
 	resp, err := http.Get(url)
 	goutil.PanicIfErr(err)
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		if len(resp.Status) > 0 {
+			fmt.Println(resp.Status)
+			return
+		}
+		fmt.Println("STATUS CODE", resp.StatusCode)
+		return
+	}
 
 	filename := from
 	pos := strings.LastIndex(from, "/")
@@ -236,7 +256,7 @@ func downloadFile(from string, to string) {
 	fmt.Println("SUCCESS")
 }
 
-func remoteDeleteFile(from string) {
+func DeleteFileHandle(from string) {
 	if len(from) == 0 {
 		panic("from is empty")
 	}
@@ -245,9 +265,22 @@ func remoteDeleteFile(from string) {
 	goutil.PanicIfErr(err)
 	defer resp.Body.Close()
 
-	resp_body, err := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	goutil.PanicIfErr(err)
-	fmt.Println(string(resp_body))
+	fmt.Println(string(body))
+}
+
+func ListFileHandle(from string) {
+	if len(from) == 0 {
+		from = "/"
+	}
+	resp, err := http.Get(config.listUrl(from))
+	goutil.PanicIfErr(err)
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	goutil.PanicIfErr(err)
+	fmt.Println(string(body))
 }
 
 func splitFile(filename string, pathChan chan string) {
@@ -289,7 +322,7 @@ func postFile(filename string, targetUrl string, fileds map[string]string) error
 	fmt.Println("post", targetUrl, filename)
 	bodyBuf := &bytes.Buffer{}
 	bodyWriter := multipart.NewWriter(bodyBuf)
-	fileWriter, err := bodyWriter.CreateFormFile("uploadFile", filename)
+	fileWriter, err := bodyWriter.CreateFormFile("uploadFileHandle", filename)
 	if err != nil {
 		fmt.Println("error writing to buffer")
 		return err
