@@ -56,9 +56,8 @@ func (c Config) address() string {
 	return fmt.Sprintf("http://%s:%s", c.Host, c.Port)
 }
 
-func (c Config) uploadUrl(path string) string {
-	tmp := c.append(c.address(), "upload")
-	return c.append(tmp, path)
+func (c Config) uploadUrl() string {
+	return c.append(c.address(), "upload")
 }
 
 func (c Config) deleteUrl(path string) string {
@@ -198,7 +197,7 @@ func uploadFileHandle(from string, to string) {
 	}
 
 	if fileSize < maxUploadSize {
-		err := postFile(filename, config.uploadUrl(to), fields)
+		err := postFile(filename, config.uploadUrl(), fields)
 		goutil.PanicIfErr(err)
 	} else {
 		pathChan := make(chan string, 5)
@@ -207,7 +206,7 @@ func uploadFileHandle(from string, to string) {
 		for path := range pathChan {
 			index += 1
 			fields["multiindex"] = strconv.Itoa(index)
-			err := postFile(path, config.uploadUrl(to), fields)
+			err := postFile(path, config.uploadUrl(), fields)
 			goutil.PanicIfErr(err)
 		}
 	}
@@ -322,7 +321,7 @@ func postFile(filename string, targetUrl string, fileds map[string]string) error
 	fmt.Println("post", targetUrl, filename)
 	bodyBuf := &bytes.Buffer{}
 	bodyWriter := multipart.NewWriter(bodyBuf)
-	fileWriter, err := bodyWriter.CreateFormFile("uploadFileHandle", filename)
+	fileWriter, err := bodyWriter.CreateFormFile("uploadFile", filename)
 	if err != nil {
 		fmt.Println("error writing to buffer")
 		return err

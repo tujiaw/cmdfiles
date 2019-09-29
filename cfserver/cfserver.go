@@ -55,6 +55,7 @@ func uploadFileHandler() http.HandlerFunc {
 		dir := r.PostFormValue("dir")
 		dir = filepath.Join(mainDir, dir)
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			fmt.Println("111", err)
 			renderError(w, "INVALID_DIR", http.StatusBadRequest)
 			return
 		}
@@ -67,6 +68,7 @@ func uploadFileHandler() http.HandlerFunc {
 
 		file, _, err := r.FormFile("uploadFile")
 		if err != nil {
+			fmt.Println("222", err)
 			renderError(w, "INVALID_FILE", http.StatusBadRequest)
 			return
 		}
@@ -74,6 +76,7 @@ func uploadFileHandler() http.HandlerFunc {
 
 		fileBytes, err := ioutil.ReadAll(file)
 		if err != nil {
+			fmt.Println("333", err)
 			renderError(w, "INVALID_FILE", http.StatusBadRequest)
 			return
 		}
